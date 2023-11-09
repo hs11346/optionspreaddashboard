@@ -130,7 +130,7 @@ def put_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte =
     spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width))*100
     spread_df = spread_df[spread_df['RR_ratio'] > 0]
     #ATM distance is the % difference between strike and underlying price divided by the return volatility (adjusted by dte)
-    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte + 1))
+    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte))
     spread_df = spread_df[spread_df.ATM_dist >= min_dist]
     # Min bid
     spread_df = spread_df[spread_df.bid >= min_bid]
@@ -177,7 +177,7 @@ def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte 
     spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width))*100
     spread_df = spread_df[spread_df['RR_ratio'] > 0]
     #ATM distance is the % difference between strike and underlying price divided by the return volatility (adjusted by dte)
-    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte + 1))
+    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte))
     spread_df = spread_df[spread_df.ATM_dist >= min_dist]
     # Min bid
     spread_df = spread_df[spread_df.bid >= min_bid]
