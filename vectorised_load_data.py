@@ -102,44 +102,42 @@ def put_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte =
     df = df[df.ITM == IsITM][df.CPFlag == 'P'][(df.bid >= 0)|(df.ask >=0)] # Extract OTM Puts from chain with non-zero bid-ask
     spread_df = pd.DataFrame()
     df.reset_index(inplace=True, drop=True)
-    for short_index in df.index.to_list(): # Loop for all combinations of put vertical spreads
-        for long_index in df.index.to_list():
-            if abs(df.iloc[short_index].strike - df.iloc[long_index].strike) <= max_strike_width and \
-                    df.iloc[short_index].exDate == df.iloc[long_index].exDate and \
-                    df.iloc[short_index].strike > df.iloc[long_index].strike and \
-                    df.iloc[short_index].dte <= max_dte and df.iloc[short_index].dte >= min_dte: # Specify maximum strike width and same exDate
-                dict_ = {"symbol":df.iloc[long_index].symbol+"-"+df.iloc[short_index].symbol\
-                                    ,"width":df.iloc[short_index].strike - df.iloc[long_index].strike,
-                         "short_strike":df.iloc[short_index].strike, "long_strike":df.iloc[long_index].strike,\
-                         "bid":df.iloc[short_index].bid-df.iloc[long_index].ask,\
-                                  "ask":df.iloc[short_index].ask-df.iloc[long_index].bid, \
-                         "delta": -df.iloc[short_index].delta + df.iloc[long_index].delta, \
-                         "vega": -df.iloc[short_index].vega + df.iloc[long_index].vega, \
-                         "theta": -df.iloc[short_index].theta + df.iloc[long_index].theta, \
-                         'min_vol':min(df.iloc[short_index].volume,df.iloc[long_index].volume),\
-                                  'min_oi':min(df.iloc[short_index].OI,df.iloc[long_index].OI),\
-                                  'exDate':df.iloc[short_index].exDate,\
-                                  'dte':df.iloc[short_index].dte,'underlying':underlying}
-                spread_df = pd.concat([spread_df,pd.DataFrame(dict_, index = [0])], ignore_index=True)
-    if spread_df.empty:
-        print('No combinations for {}'.format(underlying))
-        return spread_df
-    # Risk-reward ratio, Reward adjusted down by fees
-    spread_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    spread_df.dropna(inplace = True)
-    spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width))*100
-    spread_df = spread_df[spread_df['RR_ratio'] > 0]
-    #ATM distance is the % difference between strike and underlying price divided by the return volatility (adjusted by dte)
-    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte))
-    spread_df = spread_df[spread_df.ATM_dist >= min_dist]
-    # Min bid
-    spread_df = spread_df[spread_df.bid >= min_bid]
-    # RR_ratio / ATM_dist
-    spread_df['dist_RR'] = spread_df.ATM_dist/spread_df.RR_ratio
+    merged_df = df.merge(df, on='exDate', suffixes=('_short', '_long'))
+    spread_df = merged_df[
+        (abs(merged_df.strike_short - merged_df.strike_long) <= max_strike_width) &
+        (merged_df.strike_short > merged_df.strike_long) &
+        (min_dte <= merged_df.dte_short) & (merged_df.dte_short <= max_dte)
+        ].copy()
+    spread_df['width'] = spread_df.strike_short - spread_df.strike_long
+    spread_df['bid'] = spread_df.bid_short - spread_df.ask_long
+    spread_df['ask'] = spread_df.ask_short - spread_df.bid_long
+    spread_df['delta'] = -spread_df.delta_short + spread_df.delta_long
+    spread_df['vega'] = -spread_df.vega_short + spread_df.vega_long
+    spread_df['theta'] = -spread_df.theta_short + spread_df.theta_long
+
+    spread_df['min_vol'] = spread_df[['volume_short', 'volume_long']].min(axis=1)
+    spread_df['min_oi'] = spread_df[['OI_short', 'OI_long']].min(axis=1)
+
+    spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width)) * 100
+
+    spread_df['ATM_dist'] = (abs(spread_df.strike_short - current_price) / current_price) / (
+                underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short))
+
+    spread_df = spread_df[
+        (spread_df['RR_ratio'] > 0) &
+        (spread_df['ATM_dist'] >= min_dist) &
+        (spread_df['bid'] >= min_bid)
+        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','dte_short']].rename(columns = {'dte_short':'dte'})
+
+    spread_df['dist_RR'] = spread_df.ATM_dist / spread_df.RR_ratio
     spread_df[['min_vol', 'min_oi']] = spread_df[['min_vol', 'min_oi']].astype(int)
+
     spread_df = spread_df.sort_values(by='dist_RR', ascending=False)
+    spread_df['underlying'] = underlying
+
     print("{} combinations found for {}".format(len(spread_df), underlying))
     return spread_df.round(2)
+
 
 def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte = 0, max_dte = 30, fees = 0.1, min_dist = 0, min_bid = 0):
     # CCS -> long higher strike, short lower strike; Fee structure based on two way fees, futu fees = $10 per contract ($0.1)
@@ -149,43 +147,38 @@ def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte 
     df = df[df.ITM == IsITM][df.CPFlag == 'C'][(df.bid >= 0)|(df.ask >=0)] # Extract OTM Puts from chain with non-zero bid-ask
     spread_df = pd.DataFrame()
     df.reset_index(inplace=True, drop=True)
-    for short_index in df.index.to_list(): # Loop for all combinations of put vertical spreads
-        for long_index in df.index.to_list():
-            if abs(df.iloc[short_index].strike - df.iloc[long_index].strike) <= max_strike_width and \
-                    df.iloc[short_index].exDate == df.iloc[long_index].exDate and \
-                    df.iloc[short_index].strike < df.iloc[long_index].strike and \
-                    df.iloc[short_index].dte <= max_dte and df.iloc[short_index].dte >= min_dte: # Specify maximum strike width and same exDate
-                dict_ = {"symbol":df.iloc[long_index].symbol+"-"+df.iloc[short_index].symbol\
-                                    ,"width":df.iloc[long_index].strike - df.iloc[short_index].strike,
-                         "short_strike":df.iloc[short_index].strike, "long_strike":df.iloc[long_index].strike,\
-                         "bid":df.iloc[short_index].bid-df.iloc[long_index].ask,\
-                                  "ask":df.iloc[short_index].ask-df.iloc[long_index].bid, \
-                         "delta": -df.iloc[short_index].delta + df.iloc[long_index].delta, \
-                         "vega": -df.iloc[short_index].vega + df.iloc[long_index].vega, \
-                         "theta": -df.iloc[short_index].theta + df.iloc[long_index].theta, \
-                         'min_vol':min(df.iloc[short_index].volume,df.iloc[long_index].volume),\
-                                  'min_oi':min(df.iloc[short_index].OI,df.iloc[long_index].OI),\
-                                  'exDate':df.iloc[short_index].exDate,\
-                                  'dte':df.iloc[short_index].dte,'underlying':underlying}
-                spread_df = pd.concat([spread_df,pd.DataFrame(dict_, index = [0])], ignore_index=True)
-    if spread_df.empty:
-        print('No combinations for {}'.format(underlying))
-        return spread_df
-    # Risk-reward ratio, Reward adjusted down by fees
-    spread_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    spread_df.dropna(inplace=True)
-    spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width))*100
-    spread_df = spread_df[spread_df['RR_ratio'] > 0]
-    #ATM distance is the % difference between strike and underlying price divided by the return volatility (adjusted by dte)
-    spread_df['ATM_dist'] = (abs(spread_df['short_strike'] - current_price)/current_price)/(underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte))
-    spread_df = spread_df[spread_df.ATM_dist >= min_dist]
-    # Min bid
-    spread_df = spread_df[spread_df.bid >= min_bid]
-    # RR_ratio / ATM_dist
-    spread_df['dist_RR'] = spread_df.ATM_dist/spread_df.RR_ratio
-    spread_df.fillna(0,inplace=True)
+    merged_df = df.merge(df, on='exDate', suffixes=('_short', '_long'))
+    spread_df = merged_df[
+        (abs(merged_df.strike_short - merged_df.strike_long) <= max_strike_width) &
+        (merged_df.strike_short < merged_df.strike_long) &
+        (min_dte <= merged_df.dte_short) & (merged_df.dte_short <= max_dte)
+        ].copy()
+    spread_df['width'] = spread_df.strike_long - spread_df.strike_short
+    spread_df['bid'] = spread_df.bid_short - spread_df.ask_long
+    spread_df['ask'] = spread_df.ask_short - spread_df.bid_long
+    spread_df['delta'] = -spread_df.delta_short + spread_df.delta_long
+    spread_df['vega'] = -spread_df.vega_short + spread_df.vega_long
+    spread_df['theta'] = -spread_df.theta_short + spread_df.theta_long
+
+    spread_df['min_vol'] = spread_df[['volume_short', 'volume_long']].min(axis=1)
+    spread_df['min_oi'] = spread_df[['OI_short', 'OI_long']].min(axis=1)
+
+    spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width)) * 100
+
+    spread_df['ATM_dist'] = (abs(spread_df.strike_short - current_price) / current_price) / (
+            underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short))
+
+    spread_df = spread_df[
+        (spread_df['RR_ratio'] > 0) &
+        (spread_df['ATM_dist'] >= min_dist) &
+        (spread_df['bid'] >= min_bid)
+        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','dte_short']].rename(columns = {'dte_short':'dte'})
+
+    spread_df['dist_RR'] = spread_df.ATM_dist / spread_df.RR_ratio
     spread_df[['min_vol', 'min_oi']] = spread_df[['min_vol', 'min_oi']].astype(int)
+
     spread_df = spread_df.sort_values(by='dist_RR', ascending=False)
+    spread_df['underlying'] = underlying
     print("{} combinations found for {}".format(len(spread_df), underlying))
     return spread_df.round(2)
 

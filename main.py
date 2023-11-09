@@ -1,4 +1,5 @@
-from load_data import *
+from vectorised_load_data import *
+import time
 
 '''
 Streamlit Dashboard for hosting CBOE 
@@ -16,9 +17,11 @@ def load_data():
     return put, call
 
 if __name__=="__main__":
+    start_time = time.time()
+    #1204.6977639198303 seconds (unvectorised)
+    #118.43037843704224 seconds (vectorised)
     st.title('Option Spread Monitor')
     list_, config = get_config()
-    list_ = list_[0:2]
     px_df = px_screener(config, upper=70, lower=30)
     put, call = load_data()
     st.title('Welcome to the CBOE Option Vertical Spread Monitor v3.0')
@@ -40,3 +43,4 @@ if __name__=="__main__":
     with tab3:
         px = px_screener(config)
         st.dataframe(px.sort_values(by='percentile',ascending=True))
+    print("--- %s seconds ---" % (time.time() - start_time))
