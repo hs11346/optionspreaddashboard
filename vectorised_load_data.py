@@ -127,7 +127,7 @@ def put_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte =
         (spread_df['RR_ratio'] > 0) &
         (spread_df['ATM_dist'] >= min_dist) &
         (spread_df['bid'] >= min_bid)
-        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','dte_short']].rename(columns = {'dte_short':'dte'})
+        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','exDate','dte_short']].rename(columns = {'dte_short':'dte'})
 
     spread_df['dist_RR'] = spread_df.ATM_dist / spread_df.RR_ratio
     spread_df[['min_vol', 'min_oi']] = spread_df[['min_vol', 'min_oi']].astype(int)
@@ -172,7 +172,7 @@ def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte 
         (spread_df['RR_ratio'] > 0) &
         (spread_df['ATM_dist'] >= min_dist) &
         (spread_df['bid'] >= min_bid)
-        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','dte_short']].rename(columns = {'dte_short':'dte'})
+        ][['width','strike_short','strike_long','bid','ask','delta','vega','min_vol','min_oi','RR_ratio','ATM_dist','exDate','dte_short']].rename(columns = {'dte_short':'dte'})
 
     spread_df['dist_RR'] = spread_df.ATM_dist / spread_df.RR_ratio
     spread_df[['min_vol', 'min_oi']] = spread_df[['min_vol', 'min_oi']].astype(int)
