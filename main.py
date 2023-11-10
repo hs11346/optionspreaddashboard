@@ -1,8 +1,8 @@
 from vectorised_load_data import *
 import time
 import altair as alt
-
 import datetime
+st.set_page_config(layout="wide")
 '''
 Streamlit Dashboard for hosting CBOE 
 '''
@@ -12,31 +12,58 @@ def get_config():
 
 @st.cache_data(ttl=3600) # reload cache every 3600 seconds
 def load_data():
+    output_time = datetime.datetime.now()# Record the time of scrapping the option data
     freeze_support()
-    put = PCS_screener(list_, max_strike_width=3, min_dte=0, max_dte=30, fees=0.1, min_dist=1, min_bid=0.2)
+    put = PCS_screener(list_, max_strike_width=5, min_dte=0, max_dte=50, fees=0.1, min_dist=0, min_bid=0.2)
     freeze_support()
-    call = CCS_screener(list_, max_strike_width=3, min_dte=0, max_dte=30, fees=0.1, min_dist=1, min_bid=0.2)
-    return put, call
+    call = CCS_screener(list_, max_strike_width=5, min_dte=0, max_dte=50, fees=0.1, min_dist=0, min_bid=0.2)
+    return put, call, output_time
 @st.cache_data()
 def yfinance_hist(option):
     return yf.download(option, interval='1d', period='1y')
 if __name__=="__main__":
+
     start_time = time.time()
     #1204.6977639198303 seconds (unvectorised)
     #118.43037843704224 seconds (vectorised)
     st.title('Option Spread Monitor')
     list_, config = get_config()
     px_df = px_screener(config, upper=70, lower=30)
-    put, call = load_data()
+    put, call, output_time = load_data()
+    put = put[(put.min_vol > 1) & (put.min_oi > 1)]
+    call = call[(call.min_vol > 1) & (call.min_oi > 1)]
     st.title('Welcome to the CBOE Option Vertical Spread Monitor v3.0')
+    st.write("Scrapped time (delayed quotes 10-15 min)")
+    st.write(output_time)
+    st.info('**Data Analyst: [@hs11346](https://github.com/hs11346)**', icon="💡")
     option = st.sidebar.selectbox(
         'Ticker',
         list_)
-    max_width = st.sidebar.slider('Max Width', 0, 3, 3, 1)
-    max_dte = st.sidebar.slider('Max DTE', 0, 30, 30, 1)
-    min_dist = st.sidebar.slider('Min Distance', 1.1, 3.0, 1.1, 0.1)
-    min_bid = st.sidebar.slider('Min bid', 0.2, 0.5, 0.2, 0.01)
-    tab1, tab2, tab3 = st.tabs(["PCS", "CCS", 'Underlyings'])
+    max_width = st.sidebar.slider('Max Width', 0, 5, 3, 1)
+    max_dte = st.sidebar.slider('Max DTE', 0, 50, 30, 1)
+    min_dist = st.sidebar.slider('Min Distance', 0.1, 3.0, 1.1, 0.1)
+    min_bid = st.sidebar.slider('Min bid', 0.01, 0.5, 0.2, 0.01)
+    tab0, tab1, tab2, tab3 = st.tabs(['Overview',"PCS", "CCS", 'Underlyings'])
+    with tab0:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown('Overview for Put Credit Spreads')
+            overview_puts = alt.Chart(put.loc[(put.width <= max_width) & (put.dte <= max_dte) & (put.ATM_dist >= min_dist) & (put.bid >= min_bid)]).mark_point().encode(
+                x='bid',
+                y='ATM_dist',
+                color = 'underlying'
+            )
+            st.altair_chart(overview_puts.interactive(), use_container_width=True)
+        with col2:
+            st.markdown('Overview for Call Credit Spreads')
+            overview_calls = alt.Chart(call.loc[
+                                          (call.width <= max_width) & (call.dte <= max_dte) & (call.ATM_dist >= min_dist) & (
+                                                      call.bid >= min_bid)]).mark_point().encode(
+                x='bid',
+                y='ATM_dist',
+                color='underlying'
+            )
+            st.altair_chart(overview_calls.interactive(), use_container_width=True)
     with tab1:
         st.markdown('Put Credit Spread:')
         filtered_put = put.loc[(put.underlying == option) & (put.width <= max_width) & (put.dte <= max_dte) & (put.ATM_dist >= min_dist) & (put.bid >= min_bid)]
@@ -73,6 +100,13 @@ if __name__=="__main__":
         line = alt.Chart(pd.DataFrame({'Close': selection.strike_short.to_list()})).mark_rule().encode(y='Close', color = alt.value("#FF0000"))
         st.header("\nPrice Chart (Red line indicating short strike)")
         st.altair_chart((c + line).interactive(), use_container_width=True)
+
+        s = alt.Chart(filtered_put[['bid','ATM_dist','dte']]).mark_point().encode(
+            x='bid',
+            y='ATM_dist',
+            color = 'dte'
+        )
+        st.altair_chart(s.interactive(), use_container_width=True)
     with tab2:
         st.markdown('Call Credit Spread:')
         filtered_call = call.loc[(call.underlying == option) & (call.width <= max_width) & (call.dte <= max_dte) & (call.ATM_dist >= min_dist) & (call.bid >= min_bid)]
@@ -107,6 +141,13 @@ if __name__=="__main__":
         line = alt.Chart(pd.DataFrame({'Close': selection.strike_short.to_list()})).mark_rule().encode(y='Close', color = alt.value("#FF0000"))
         st.header("\nPrice Chart (Red line indicating short strike)")
         st.altair_chart((c + line).interactive(), use_container_width=True)
+
+        s = alt.Chart(filtered_call[['bid','ATM_dist','dte']]).mark_point().encode(
+            x='bid',
+            y='ATM_dist',
+            color = 'dte'
+        )
+        st.altair_chart(s.interactive(), use_container_width=True)
     with tab3:
         px = px_screener(config)
         st.dataframe(px.sort_values(by='percentile',ascending=True))

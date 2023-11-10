@@ -78,7 +78,7 @@ def PCS_screener(list_,IsITM = False, max_strike_width = 4, min_dte = 0, max_dte
     '''
     Adapted to CBOE version
     '''
-    now = datetime.datetime.now()
+
     with Pool() as pool: # New Version, multiprocessing
         x = pool.map(partial(put_credit_spread, IsITM = IsITM, max_strike_width = max_strike_width, min_dte = min_dte, max_dte = max_dte, fees = fees, min_dist = min_dist, min_bid = min_bid), list_)
     try:
@@ -124,7 +124,7 @@ def put_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte =
     spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width)) * 100
 
     spread_df['ATM_dist'] = (abs(spread_df.strike_short - current_price) / current_price) / (
-                underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short))
+                underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short + 1))
 
     spread_df = spread_df[
         (spread_df['RR_ratio'] > 0) &
@@ -169,7 +169,7 @@ def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte 
     spread_df['RR_ratio'] = ((spread_df.bid + spread_df.ask - fees * 2) / (2 * spread_df.width)) * 100
 
     spread_df['ATM_dist'] = (abs(spread_df.strike_short - current_price) / current_price) / (
-            underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short))
+            underlying_vol(underlying, days=60) * np.sqrt(spread_df.dte_short + 1))
 
     spread_df = spread_df[
         (spread_df['RR_ratio'] > 0) &
