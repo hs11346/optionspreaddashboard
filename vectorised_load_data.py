@@ -12,6 +12,7 @@ from functools import partial
 from scipy import stats
 import yfinance as yf
 import pandas_market_calendars as mcal
+
 nyse = mcal.get_calendar('NYSE')
 holidays = nyse.holidays()
 holidays = list(holidays.holidays)
@@ -27,6 +28,7 @@ def get_current_price(symbol):
     todays_data = ticker.history(period='1d', interval = '1m')
     return todays_data['Close'][-1]
 # Read CBOE option data
+@st.cache_data()
 def cboe_opx_chain(symbol):
     url = "https://cdn.cboe.com/api/global/delayed_quotes/options/{}.json".format(symbol)
     response = urlopen(url)
@@ -76,6 +78,7 @@ def PCS_screener(list_,IsITM = False, max_strike_width = 4, min_dte = 0, max_dte
     '''
     Adapted to CBOE version
     '''
+    now = datetime.datetime.now()
     with Pool() as pool: # New Version, multiprocessing
         x = pool.map(partial(put_credit_spread, IsITM = IsITM, max_strike_width = max_strike_width, min_dte = min_dte, max_dte = max_dte, fees = fees, min_dist = min_dist, min_bid = min_bid), list_)
     try:
