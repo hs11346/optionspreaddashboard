@@ -185,7 +185,7 @@ def call_credit_spread(underlying, IsITM = False, max_strike_width = 4, min_dte 
     print("{} combinations found for {}".format(len(spread_df), underlying))
     return spread_df.round(2)
 
-def rsi_value(underlying, upper = 70, lower = 30):
+def rsi_value(underlying):
     symbol = yf.Ticker(underlying)
     df = symbol.history(interval="1d", period="1mo", auto_adjust=True).tail(30)
     change = df["Close"].diff()
@@ -201,12 +201,6 @@ def rsi_value(underlying, upper = 70, lower = 30):
     rsi = 100 * avg_up / (avg_up + avg_down)
     # Take a look at the 20 oldest datapoints
     value = rsi.iloc[-1]
-    if value >= upper:
-        value = 1
-    elif value <= lower:
-        value = -1
-    else:
-        value = 0
     return value
 
 def one_year_percentile(underlying):
@@ -216,8 +210,8 @@ def one_year_percentile(underlying):
     return stats.percentileofscore(df['Close'], current, kind='mean')
 
 @st.cache_data()
-def px_screener(df, upper = 70, lower = 30):
-    df['rsi'] = df.Tickers.apply(lambda x: rsi_value(x, upper = upper, lower= lower))
+def px_screener(df):
+    df['rsi'] = df.Tickers.apply(lambda x: rsi_value(x))
     df['percentile'] = df.Tickers.apply(lambda x: one_year_percentile(x))
     return df
 

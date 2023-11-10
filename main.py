@@ -12,7 +12,7 @@ def get_config():
 
 @st.cache_data(ttl=3600) # reload cache every 3600 seconds
 def load_data():
-    output_time = datetime.datetime.now()# Record the time of scrapping the option data
+    output_time = datetime.datetime.now(datetime.timezone.utc)# Record the time of scrapping the option data
     freeze_support()
     put = PCS_screener(list_, max_strike_width=5, min_dte=0, max_dte=50, fees=0.1, min_dist=0, min_bid=0.2)
     freeze_support()
@@ -22,13 +22,12 @@ def load_data():
 def yfinance_hist(option):
     return yf.download(option, interval='1d', period='1y')
 if __name__=="__main__":
-
     start_time = time.time()
     #1204.6977639198303 seconds (unvectorised)
     #118.43037843704224 seconds (vectorised)
     st.title('Option Spread Monitor')
     list_, config = get_config()
-    px_df = px_screener(config, upper=70, lower=30)
+    px_df = px_screener(config)
     put, call, output_time = load_data()
     put = put[(put.min_vol > 1) & (put.min_oi > 1)]
     call = call[(call.min_vol > 1) & (call.min_oi > 1)]
@@ -149,7 +148,22 @@ if __name__=="__main__":
         )
         st.altair_chart(s.interactive(), use_container_width=True)
     with tab3:
-        px = px_screener(config)
-        st.dataframe(px.sort_values(by='percentile',ascending=True))
+        col1, col2 = st.columns(2)
+        with col1:
+            px = px_screener(config)
+            #st.dataframe(px.sort_values(by='percentile',ascending=True))
+            base = alt.Chart(px).encode(
+                x='rsi',
+                y="Tickers:O",
+                text='rsi',
+                #color = alt.condition(alt.datum['rsi'] > 70,alt.value('darkred'),alt.value('lightgreen'))
+            )
+            st.altair_chart((base.mark_bar() + base.mark_text(align='left', dx=2)).interactive(), use_container_width=True)
+        with col2:
+            base = alt.Chart(px).encode(
+                x='percentile',
+                y="Tickers:O",
+                text='percentile')
+            st.altair_chart((base.mark_bar() + base.mark_text(align='left', dx=2)).interactive(), use_container_width=True)
     print("--- %s seconds ---" % (time.time() - start_time))
     st.code("Output refreshed --- %s seconds ---" % round(time.time() - start_time,4))
