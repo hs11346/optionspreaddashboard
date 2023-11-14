@@ -34,9 +34,10 @@ if __name__=="__main__":
     put, call, output_time = load_data()
     put = put[(put.min_vol > 1) & (put.min_oi > 1)]
     call = call[(call.min_vol > 1) & (call.min_oi > 1)]
-    st.title('Welcome to the CBOE Option Vertical Spread Monitor v3.0')
+    st.title('Welcome to the CBOE Option Vertical Spread Monitor v4.0')
     st.write("Scrapped time (delayed quotes 10-15 min)")
     st.write(output_time)
+    st.write('Integrated with Refinitiv Data Platform')
     st.info('**Data Analyst: [@hs11346](https://github.com/hs11346)**', icon="💡")
     option = st.sidebar.selectbox(
         'Ticker',
