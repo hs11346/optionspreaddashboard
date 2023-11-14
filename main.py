@@ -2,6 +2,9 @@ from vectorised_load_data import *
 import time
 import altair as alt
 import datetime
+from ifa_files.hist_atmvol import get_historical_iv
+from ifa_files.plotting_helper import *
+from ifa_files.eti_surfaces import get_surface
 st.set_page_config(layout="wide")
 '''
 Streamlit Dashboard for hosting CBOE 
@@ -38,10 +41,13 @@ if __name__=="__main__":
     option = st.sidebar.selectbox(
         'Ticker',
         list_)
+    atm_vol = get_historical_iv(list_)
     max_width = st.sidebar.slider('Max Width', 0, 5, 3, 1)
     max_dte = st.sidebar.slider('Max DTE', 0, 50, 30, 1)
     min_dist = st.sidebar.slider('Min Distance', 0.1, 3.0, 1.1, 0.1)
     min_bid = st.sidebar.slider('Min bid', 0.01, 0.5, 0.2, 0.01)
+    if st.sidebar.button('Reset cache'):
+        st.cache_data.clear()
     tab0, tab1, tab2, tab3 = st.tabs(['Overview',"PCS", "CCS", 'Underlyings'])
     with tab0:
         col1, col2 = st.columns(2)
@@ -67,7 +73,6 @@ if __name__=="__main__":
         st.markdown('Put Credit Spread:')
         filtered_put = put.loc[(put.underlying == option) & (put.width <= max_width) & (put.dte <= max_dte) & (put.ATM_dist >= min_dist) & (put.bid >= min_bid)]
         #st.dataframe(filtered_put)
-
 
         def dataframe_with_selections(df):
             df_with_selections = df.copy()
@@ -99,13 +104,22 @@ if __name__=="__main__":
         line = alt.Chart(pd.DataFrame({'Close': selection.strike_short.to_list()})).mark_rule().encode(y='Close', color = alt.value("#FF0000"))
         st.header("\nPrice Chart (Red line indicating short strike)")
         st.altair_chart((c + line).interactive(), use_container_width=True)
-
+        st.header("\nRisk-Reward plot")
         s = alt.Chart(filtered_put[['bid','ATM_dist','dte']]).mark_point().encode(
             x='bid',
             y='ATM_dist',
             color = 'dte'
         )
         st.altair_chart(s.interactive(), use_container_width=True)
+
+        vol = alt.Chart(atm_vol[atm_vol.sym == option][['date','iv']]).mark_line().encode(
+            x='date',
+            y='iv'
+        )
+        c.encoding.y.scale = alt.Scale(domain=[atm_vol.iv.min() * 0.95, atm_vol.iv.max() * 1.05])
+        st.header("\nHistorical 30 day implied volatility")
+        st.altair_chart(vol.interactive(), use_container_width=True)
+
     with tab2:
         st.markdown('Call Credit Spread:')
         filtered_call = call.loc[(call.underlying == option) & (call.width <= max_width) & (call.dte <= max_dte) & (call.ATM_dist >= min_dist) & (call.bid >= min_bid)]
@@ -140,13 +154,20 @@ if __name__=="__main__":
         line = alt.Chart(pd.DataFrame({'Close': selection.strike_short.to_list()})).mark_rule().encode(y='Close', color = alt.value("#FF0000"))
         st.header("\nPrice Chart (Red line indicating short strike)")
         st.altair_chart((c + line).interactive(), use_container_width=True)
-
+        st.header("\nRisk-Reward plot")
         s = alt.Chart(filtered_call[['bid','ATM_dist','dte']]).mark_point().encode(
             x='bid',
             y='ATM_dist',
             color = 'dte'
         )
         st.altair_chart(s.interactive(), use_container_width=True)
+        vol = alt.Chart(atm_vol[atm_vol.sym == option][['date', 'iv']]).mark_line().encode(
+            x='date',
+            y='iv'
+        )
+        c.encoding.y.scale = alt.Scale(domain=[atm_vol.iv.min() * 0.95, atm_vol.iv.max() * 1.05])
+        st.header("\nHistorical 30 day implied volatility")
+        st.altair_chart(vol.interactive(), use_container_width=True)
     with tab3:
         col1, col2 = st.columns(2)
         with col1:
@@ -165,5 +186,7 @@ if __name__=="__main__":
                 y="Tickers:O",
                 text='percentile')
             st.altair_chart((base.mark_bar() + base.mark_text(align='left', dx=2)).interactive(), use_container_width=True)
+        st.pyplot(plot_smile(get_surface() , 1))
+        st.pyplot(plot_term_volatility(get_surface(), 1))
     print("--- %s seconds ---" % (time.time() - start_time))
     st.code("Output refreshed --- %s seconds ---" % round(time.time() - start_time,4))

@@ -17,9 +17,11 @@ holidays = nyse.holidays()
 holidays = list(holidays.holidays)
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
+
 '''
-Get data from CBOE link
-Delayed data (around 10-15 min?), suitable for EOD or before market open analysis
+(LEGACY CODE) Unoptimised Code
+Uses multiprocessing instead of self join, takes 30 min instead of 200 seconds
+See for vectorised_load_data.py for usage
 '''
 
 def get_current_price(symbol):
