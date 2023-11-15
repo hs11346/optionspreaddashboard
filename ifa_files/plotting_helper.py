@@ -8,6 +8,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Matplotlib requires dates in float format for surface plots.
+'''
+Please try to change it to altair charts for streamlit integration
+'''
 def convert_yyyymmdd_to_float(date_string_array):
     import datetime
     import matplotlib.dates as dates

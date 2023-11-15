@@ -11,12 +11,12 @@ st.set_page_config(layout="wide")
 '''
 Streamlit Dashboard for hosting CBOE 
 '''
-def get_config():
+def get_config(): # Read config file to get tickers
     config = pd.read_csv('config.csv')
     return config.Tickers.to_list(), config
 
 @st.cache_data(ttl=3600) # reload cache every 3600 seconds
-def load_data():
+def load_data(): # Scrap the data from CBOE through calling the functions from vectorised_load_data.py
     output_time = datetime.datetime.now(datetime.timezone.utc)# Record the time of scrapping the option data
     freeze_support()
     put = PCS_screener(list_, max_strike_width=5, min_dte=0, max_dte=50, fees=0.1, min_dist=0, min_bid=0.2)
@@ -24,38 +24,43 @@ def load_data():
     call = CCS_screener(list_, max_strike_width=5, min_dte=0, max_dte=50, fees=0.1, min_dist=0, min_bid=0.2)
     return put, call, output_time
 @st.cache_data()
-def yfinance_hist(option):
+def yfinance_hist(option): # Getting price data from yahoo finance
     return yf.download(option, interval='1d', period='1y')
 if __name__=="__main__":
     start_time = time.time()
-    #1204.6977639198303 seconds (unvectorised)
-    #118.43037843704224 seconds (vectorised)
     st.title('Option Spread Monitor')
     list_, config = get_config()
     px_df = px_screener(config)
-    put, call, output_time = load_data()
-    put = put[(put.min_vol > 1) & (put.min_oi > 1)]
+    put, call, output_time = load_data() # Get option chains
+    put = put[(put.min_vol > 1) & (put.min_oi > 1)] # Filter for options with non-zero volume and open interest
     call = call[(call.min_vol > 1) & (call.min_oi > 1)]
     st.title('Welcome to the CBOE Option Vertical Spread Monitor v4.0')
     st.write("Scrapped time (delayed quotes 10-15 min)")
-    st.write(output_time)
+    st.write(output_time) # Show the time when the option chain is scrapped
     st.write('Integrated with Refinitiv Data Platform')
-    st.info('**Data Analyst: [@hs11346](https://github.com/hs11346)**', icon="💡")
+    st.info('**Data Analyst: [@hs11346](https://github.com/hs11346)**', icon="💡") # Ackowledgements
     option = st.sidebar.selectbox(
         'Ticker',
         list_)
     atm_vol = get_historical_iv(list_)
+    # Add in the changable parameters for screening option spreads
     max_width = st.sidebar.slider('Max Width', 0, 5, 3, 1)
     max_dte = st.sidebar.slider('Max DTE', 0, 50, 30, 1)
     min_dist = st.sidebar.slider('Min Distance', 0.1, 3.0, 1.1, 0.1)
     min_bid = st.sidebar.slider('Min bid', 0.01, 0.5, 0.2, 0.01)
+
+    # Button to reset cache and re-scrap option chains
     if st.sidebar.button('Reset cache'):
         st.cache_data.clear()
+
+    # Define the four tabs
     tab0, tab1, tab2, tab3 = st.tabs(['Overview',"PCS", "CCS", 'Underlyings'])
     with tab0:
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2) # Define columns
         with col1:
             st.markdown('Overview for Put Credit Spreads')
+
+            # Plot total risk reward chart
             overview_puts = alt.Chart(put.loc[(put.width <= max_width) & (put.dte <= max_dte) & (put.ATM_dist >= min_dist) & (put.bid >= min_bid)]).mark_point().encode(
                 x='bid',
                 y='ATM_dist',
@@ -64,6 +69,8 @@ if __name__=="__main__":
             st.altair_chart(overview_puts.interactive(), use_container_width=True)
         with col2:
             st.markdown('Overview for Call Credit Spreads')
+
+            # Plot total risk reward chart
             overview_calls = alt.Chart(call.loc[
                                           (call.width <= max_width) & (call.dte <= max_dte) & (call.ATM_dist >= min_dist) & (
                                                       call.bid >= min_bid)]).mark_point().encode(
@@ -74,10 +81,9 @@ if __name__=="__main__":
             st.altair_chart(overview_calls.interactive(), use_container_width=True)
     with tab1:
         st.markdown('Put Credit Spread:')
+        # Get filtered option spreads based on parameters
         filtered_put = put.loc[(put.underlying == option) & (put.width <= max_width) & (put.dte <= max_dte) & (put.ATM_dist >= min_dist) & (put.bid >= min_bid)]
-        #st.dataframe(filtered_put)
-
-        def dataframe_with_selections(df):
+        def dataframe_with_selections(df): # Define the interactive dataframe with select feature
             df_with_selections = df.copy()
             df_with_selections.insert(0, "Select", False)
 
@@ -99,11 +105,12 @@ if __name__=="__main__":
         # Graphing
         df = yfinance_hist(option)
         df.reset_index(inplace=True)
-        c = alt.Chart(df).mark_line().encode(
+        c = alt.Chart(df).mark_line().encode( # plot price chart
             x='Date',
             y='Close'
         )
-        c.encoding.y.scale = alt.Scale(domain=[df.Close.min()*0.95, df.Close.max()*1.05])
+        c.encoding.y.scale = alt.Scale(domain=[df.Close.min()*0.95, df.Close.max()*1.05]) # adjust min max of y axis
+        # Add in selected lines from the interactive dataframe
         line = alt.Chart(pd.DataFrame({'Close': selection.strike_short.to_list()})).mark_rule().encode(y='Close', color = alt.value("#FF0000"))
         st.header("\nPrice Chart (Red line indicating short strike)")
         st.altair_chart((c + line).interactive(), use_container_width=True)

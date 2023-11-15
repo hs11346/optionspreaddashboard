@@ -4,6 +4,8 @@ import numpy as np
 from ifa_files.session import *
 from datetime import datetime, timedelta
 import streamlit as st
+# Code to get historical iv through rdp.get_data()
+
 '''
 # code for searching for ATM IV RICs (there might be multiple RICS)
 response = rdp.search(

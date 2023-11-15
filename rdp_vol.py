@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 from ifa_files.plotting_helper import *
 from ifa_files.eti_surfaces import *
 
+'''
+Useless
+'''
 plot_surface(surfaces, rics[0])
 #plot_smile(surfaces, 1)
 #plot_term_volatility(surfaces, 1)

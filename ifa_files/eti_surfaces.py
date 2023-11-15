@@ -2,6 +2,9 @@ import refinitiv.dataplatform as rdp
 from ifa_files.session import *
 import streamlit as st
 
+'''
+Function to get surface object from RDP session, which is passed to main.py to plot using plotting_helper.py functions
+'''
 def surface_template(ric):
     template = {
                 "surfaceTag": ric,

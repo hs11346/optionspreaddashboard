@@ -1,5 +1,7 @@
 import refinitiv.dataplatform as rdp
 
+# Object used to open a RDP session
+
 session = rdp.open_platform_session(
     "eb849581f17b4d9180e48d1cd10b2a8635ab1ffd",
     rdp.GrantPassword(
