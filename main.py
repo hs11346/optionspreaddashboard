@@ -196,7 +196,6 @@ if __name__=="__main__":
                 y="Tickers:O",
                 text='percentile')
             st.altair_chart((base.mark_bar() + base.mark_text(align='left', dx=2)).interactive(), use_container_width=True)
-        st.pyplot(plot_smile(get_surface() , 1))
-        st.pyplot(plot_term_volatility(get_surface(), 1))
+
     print("--- %s seconds ---" % (time.time() - start_time))
     st.code("Output refreshed --- %s seconds ---" % round(time.time() - start_time,4))
